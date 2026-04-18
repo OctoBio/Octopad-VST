@@ -13,7 +13,7 @@ public:
     explicit LiquidView (OctoPadAudioProcessor& p);
     ~LiquidView() override;
 
-    void paint (juce::Graphics& g) override;   // fallback when GL not ready
+    void paint (juce::Graphics& g) override;
     void resized() override;
 
 private:
@@ -27,13 +27,26 @@ private:
     std::unique_ptr<juce::OpenGLShaderProgram> shader;
     juce::uint32 vao = 0;
 
-    // Cached uniform locations
-    std::unique_ptr<juce::OpenGLShaderProgram::Uniform> uRes, uTime, uLevel, uLfo,
-        uCutoff, uReso, uShimmer, uDrive, uCharacter, uMovement, uDetune;
+    struct U
+    {
+        std::unique_ptr<juce::OpenGLShaderProgram::Uniform> ptr;
+        void create (juce::OpenGLShaderProgram& s, const char* name)
+        {
+            ptr = std::make_unique<juce::OpenGLShaderProgram::Uniform> (s, name);
+        }
+    };
+
+    U uRes, uTime, uLevel, uLfo;
+    U uCharacter, uDetune, uSub, uNoise;
+    U uCutoff, uReso, uDrive, uTone;
+    U uAttack, uRelease, uGlide, uSpread, uMovement;
+    U uChorus, uShimmer;
+    U uReverbSize, uReverbMix;
+    U uDelayTime, uDelayFb, uDelayMix;
+    U uGain;
 
     double startTimeSec = 0.0;
     bool shaderReady = false;
-    float fallbackPhase = 0.0f;
 
     float readParam (const char* id) const;
 

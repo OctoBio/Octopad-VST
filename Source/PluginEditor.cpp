@@ -58,13 +58,18 @@ void OctoPadLookAndFeel::drawRotarySlider (juce::Graphics& g, int x, int y, int 
     g.setColour (juce::Colours::black.withAlpha (0.25f));
     g.drawEllipse (disc, 1.0f);
 
-    // Indicator line
-    const float tickLen = innerR * 0.65f;
-    juce::Point<float> tip { centre.x + std::cos (angle) * tickLen,
-                             centre.y + std::sin (angle) * tickLen };
+    // Indicator line : JUCE arcs use 0 = 12 o'clock, clockwise positive, so the
+    // unit vector for a given angle in screen space is (sin, -cos) - NOT the
+    // usual (cos, sin). This keeps the tick perfectly on the filled arc.
+    const float tickOuter = innerR * 0.92f;
+    const float tickInner = innerR * 0.35f;
+    juce::Point<float> p0 { centre.x + std::sin (angle) * tickInner,
+                            centre.y - std::cos (angle) * tickInner };
+    juce::Point<float> p1 { centre.x + std::sin (angle) * tickOuter,
+                            centre.y - std::cos (angle) * tickOuter };
     g.setColour (accent);
-    g.drawLine ({ centre, tip }, 2.0f);
-    g.fillEllipse (centre.x - 2.0f, centre.y - 2.0f, 4.0f, 4.0f);
+    g.drawLine ({ p0, p1 }, 2.0f);
+    g.fillEllipse (centre.x - 1.6f, centre.y - 1.6f, 3.2f, 3.2f);
 }
 
 juce::Label* OctoPadLookAndFeel::createSliderTextBox (juce::Slider& s)
