@@ -170,24 +170,20 @@ void main()
     field += (grain - 0.5) * 0.22 * uNoise;
 
     // ============================================================
-    // INK TEXTURE (inside the blob, like the reference image)
+    // MULTI-PIGMENT INK TEXTURE (several coloured noises mixing like
+    // real inks diffusing into water)
     // ============================================================
-    // Low-freq density swirls
-    vec2 tuv = wuv * 2.2 + vec2(t * 0.08, -t * 0.06);
-    float inkLo = fbm(tuv, 4);
+    vec2 tuv = wuv * 1.7 + vec2(t * 0.09, -t * 0.07);
 
-    // Mid-freq : warped by the low-freq noise (looks "inky")
-    float inkMi = fbm(tuv * 2.6 + inkLo * 1.2 + vec2(-t*0.05, t*0.04), 3);
+    float n1 = fbm(tuv, 4);                                           // slow large blobs
+    float n2 = fbm(tuv * 2.1 + vec2(n1 * 1.4, -n1 * 1.1), 3);         // warped mid
+    float n3 = fbm(tuv * 4.2 + vec2(-n2 * 0.9, n1 * 0.8), 3);         // warped fine
+    float n4 = fbm(tuv * 0.55 + vec2(t * 0.04, -t * 0.05), 3);        // very slow huge
+    float n5 = fbm(tuv * 7.0 + vec2(t * 0.25, -t * 0.20), 2);         // detail
 
-    // Hi-freq : Noise param adds grain
-    float inkHi = fbm(tuv * 9.0 + vec2(t*0.3, -t*0.25), 2);
-
-    // Combined internal density : 0 (light) .. 1 (dark ink)
-    float density = clamp(0.25 + inkLo * 1.1 + inkMi * 0.6 - inkHi * 0.25, 0.0, 1.0);
-
-    // Release / Attack breath : slow internal pulsation of density
-    float breath = sin(t * (0.25 + uAttack * 0.7)) * 0.5 + 0.5;
-    density *= mix(1.0, 0.75 + 0.35 * breath, uRelease * 0.6);
+    // Release / Attack : breath modulates how much density the pigments have
+    float breath = 0.5 + 0.5 * sin(t * (0.22 + uAttack * 0.7));
+    float breathMix = mix(1.0, 0.75 + 0.35 * breath, uRelease * 0.6);
 
     // ============================================================
     // EDGE / RIM
@@ -229,25 +225,62 @@ void main()
     bg += haloOut * tint * uReverbMix * 0.14;
 
     // ============================================================
-    // INK FILL (the textured interior)
+    // INK FILL : multi-pigment blend
+    //
+    // Each pigment is a noise layer mapped to a vivid ink colour.
+    // Effect knobs intensify each pigment so the "tache" literally
+    // changes colour with your patch.
     // ============================================================
-    // Base ink colour modulated by density (black <-> mid grey-ink)
-    vec3 inside = mix(inkMid, ink, density);
+    // Deep but not black base (indigo) so colours can pop.
+    vec3 base = vec3(0.055, 0.075, 0.115);
 
-    // Inject subtle coloured veins from the mid-freq FBM
-    inside += tint * inkMi * inkMi * 0.18;
+    // Pigment amounts - each effect boosts its associated pigment.
+    // Base level ~1.0 so pigments are already vivid; effects push beyond.
+    float aGold    = 1.00 + 0.60 * uCharacter;
+    float aViolet  = 1.00 + 0.90 * uShimmer;
+    float aTeal    = 1.00 + 0.85 * uMovement;
+    float aAmber   = 0.95 + 0.85 * uDrive;
+    float aCyan    = 0.90 + 0.85 * uChorus;
+    float aMag     = 0.85 + 0.95 * uReso;
+    float aRose    = 0.80 + 0.80 * uReverbMix;
+    vec3 rose      = vec3(0.95, 0.55, 0.72);
 
-    // Character gives a pronounced ink "body" (mix toward pure ink)
-    inside = mix(inside, ink, uCharacter * 0.45);
+    vec3 inside = base;
 
-    // Sub : a deeper dark pulsing core
+    // Each pigment is revealed where its noise is high; softer thresholds
+    // let more pigment show, closer to the watercolour reference.
+    inside = mix(inside, gold    * aGold,   smoothstep(0.18, 0.72, n1)       * 0.95);
+    inside = mix(inside, violet  * aViolet, smoothstep(0.20, 0.74, n2)       * 0.92);
+    inside = mix(inside, teal    * aTeal,   smoothstep(0.22, 0.76, n3)       * 0.88);
+    inside = mix(inside, amber   * aAmber,  smoothstep(0.28, 0.82, n4)       * 0.85);
+    inside = mix(inside, cyan    * aCyan,   smoothstep(0.40, 0.86, n1 * n3 * 2.2) * 0.80);
+    inside = mix(inside, magenta * aMag,    smoothstep(0.40, 0.86, n2 * n4 * 2.2) * 0.80);
+    inside = mix(inside, rose    * aRose,   smoothstep(0.30, 0.84, n4 * n5 * 2.0) * 0.75);
+
+    // A brightness boost so the "tache" really glows
+    inside *= 1.35;
+
+    // Breath modulation
+    inside *= breathMix;
+
+    // Subtle darker ink veins where 2 pigment noises both dip (gives
+    // realistic "ink bleeding into paper" look).
+    float veins = smoothstep(0.30, 0.05, n2) * smoothstep(0.35, 0.05, n3);
+    inside = mix(inside, base * 0.55, veins * 0.55);
+
+    // Character slightly deepens overall body (small so colours survive)
+    inside = mix(inside, base * 0.6, uCharacter * 0.12);
+
+    // Sub : subtle darker pulsing core (scaled down so it doesn't kill colour)
     float subPulse = 0.5 + 0.5 * sin(t * 1.2);
-    inside = mix(inside, ink * 0.6,
-                 uSub * smoothstep(0.8, 0.0, length(wuv)) * (0.6 + 0.4*subPulse));
+    float coreMask = smoothstep(0.55, 0.0, length(wuv));
+    inside = mix(inside, base * 0.35,
+                 uSub * coreMask * (0.55 + 0.45 * subPulse) * 0.35);
 
-    // Noise param scatters bright micro-speckles inside
-    float speck = step(0.985, hash21(floor(uv * 420.0) + floor(t * 18.0)));
-    inside += vec3(speck) * uNoise * 0.35;
+    // Noise : bright micro-speckles + slight grain over the ink
+    float speck = step(0.986, hash21(floor(uv * 420.0) + floor(t * 18.0)));
+    inside += vec3(speck) * (0.35 + uNoise * 0.8);
+    inside += (n5 - 0.5) * 0.08 * uNoise;
 
     // ============================================================
     // FINAL COMPOSITE
@@ -271,12 +304,12 @@ void main()
     // Tone cast
     col *= warmCool;
 
-    // Overall gain influences brightness floor subtly
-    col *= (0.82 + uGain * 0.3);
+    // Overall gain slightly lifts brightness
+    col *= (0.94 + uGain * 0.2);
 
-    // Vignette
-    float v = smoothstep(1.8, 0.15, length(uv));
-    col *= mix(0.40, 1.0, v);
+    // Gentle vignette only at the far corners (less darkening)
+    float v = smoothstep(1.9, 0.25, length(uv));
+    col *= mix(0.65, 1.0, v);
 
     fragColor = vec4(col, 1.0);
 }
