@@ -166,6 +166,22 @@ void OctoPadAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce
     if (lastSample < numSamples)
         engine.process (buffer, lastSample, numSamples - lastSample);
 
+    // Publish a peak level for the UI (thread-safe, lossy IIR smoothing).
+    float peak = 0.0f;
+    for (int ch = 0; ch < buffer.getNumChannels(); ++ch)
+        peak = juce::jmax (peak, buffer.getMagnitude (ch, 0, numSamples));
+    const float prev = uiAudioLevel.load (std::memory_order_relaxed);
+    const float smoothed = prev * 0.78f + peak * 0.22f;
+    uiAudioLevel.store (smoothed, std::memory_order_relaxed);
+
+    // Advance a coarse LFO phase for the UI, locked to Motion Rate param.
+    const float motionRate = apvts.getRawParameterValue ("motionRate")->load();
+    const float lfoHz = 0.05f * std::pow (80.0f, juce::jlimit (0.0f, 1.0f, motionRate));
+    const float dt = (float) numSamples / (float) getSampleRate();
+    float phase = uiLfoPhase.load (std::memory_order_relaxed) + lfoHz * dt;
+    phase -= std::floor (phase);
+    uiLfoPhase.store (phase, std::memory_order_relaxed);
+
     // Mirror to mono if needed
     if (totalOut == 1 && buffer.getNumChannels() >= 2)
     {

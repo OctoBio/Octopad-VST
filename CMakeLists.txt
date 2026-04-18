@@ -38,6 +38,7 @@ target_sources(OctoPad PRIVATE
     Source/PluginEditor.cpp
     Source/PadEngine.cpp
     Source/Presets.cpp
+    Source/LiquidView.cpp
 )
 
 target_compile_definitions(OctoPad PUBLIC
@@ -51,6 +52,7 @@ target_link_libraries(OctoPad PRIVATE
     juce::juce_audio_utils
     juce::juce_audio_plugin_client
     juce::juce_dsp
+    juce::juce_opengl
     PUBLIC
     juce::juce_recommended_config_flags
     juce::juce_recommended_lto_flags

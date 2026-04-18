@@ -2,6 +2,7 @@
 
 #include <juce_audio_utils/juce_audio_utils.h>
 #include "PluginProcessor.h"
+#include "LiquidView.h"
 
 // Minimal, refined LookAndFeel : charcoal + champagne gold accent.
 class OctoPadLookAndFeel : public juce::LookAndFeel_V4
@@ -60,6 +61,9 @@ public:
 private:
     OctoPadAudioProcessor& proc;
     OctoPadLookAndFeel lnf;
+
+    // Central reactive liquid simulation
+    std::unique_ptr<LiquidView> liquid;
 
     // Header
     juce::ComboBox presetBox;

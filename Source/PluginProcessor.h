@@ -35,6 +35,11 @@ public:
 
     juce::AudioProcessorValueTreeState apvts;
 
+    // Thread-safe audio level for the UI (0..~1, peak magnitude of last block).
+    std::atomic<float> uiAudioLevel { 0.0f };
+    // LFO phase (0..1), updated each block - lets the UI visualise Motion Rate.
+    std::atomic<float> uiLfoPhase   { 0.0f };
+
 private:
     juce::AudioProcessorValueTreeState::ParameterLayout createLayout();
     void pushParamsToEngine();

@@ -185,9 +185,11 @@ OctoPadEditor::OctoPadEditor (OctoPadAudioProcessor& p)
     : AudioProcessorEditor (p), proc (p)
 {
     setLookAndFeel (&lnf);
+    liquid = std::make_unique<LiquidView> (proc);
+    addAndMakeVisible (*liquid);
     buildUI();
     setResizable (false, false);
-    setSize (920, 560);
+    setSize (960, 740);
 }
 
 OctoPadEditor::~OctoPadEditor()
@@ -295,10 +297,19 @@ void OctoPadEditor::paint (juce::Graphics& g)
     g.drawText ("ambient pad synthesizer", juce::Rectangle<int> (24, 44, 200, 16),
                 juce::Justification::centredLeft);
 
+    // Liquid viewport frame (drawn behind the GL view for soft aesthetic)
+    if (liquid != nullptr)
+    {
+        auto lb = liquid->getBounds().toFloat().expanded (1.0f);
+        g.setColour (OctoPadLookAndFeel::accent.withAlpha (0.32f));
+        g.drawRoundedRectangle (lb, 8.0f, 1.0f);
+    }
+
     // Section labels (draw above each row) - computed in resized via layout data
     auto body = getLocalBounds();
     body.removeFromTop (72);
-    body = body.reduced (24, 16);
+    body.removeFromTop (220); // reserved for liquid view + margin
+    body = body.reduced (24, 12);
 
     const int rowH = body.getHeight() / (int) layout.size();
     for (int i = 0; i < (int) layout.size(); ++i)
@@ -332,8 +343,13 @@ void OctoPadEditor::resized()
     presetArea.removeFromRight (6);
     presetBox.setBounds (presetArea);
 
+    // Central liquid view
+    auto liquidArea = r.removeFromTop (220).reduced (24, 10);
+    if (liquid != nullptr)
+        liquid->setBounds (liquidArea);
+
     // Body: rows by section
-    auto body = r.reduced (24, 16);
+    auto body = r.reduced (24, 12);
     const int rowH = body.getHeight() / (int) layout.size();
 
     size_t knobIdx = 0;
